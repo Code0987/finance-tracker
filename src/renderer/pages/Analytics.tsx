@@ -52,7 +52,7 @@ const Analytics: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [period, setPeriod] = useState<Period>('monthly');
   const [accountFilter, setAccountFilter] = useState<string>('');
-  const [accountTypeFilter, setAccountTypeFilter] = useState<string>('');
+  const [accountTypeFilter, setAccountTypeFilter] = useState<'' | 'bank' | 'credit_card'>('');
 
   const [expensesByCategory, setExpensesByCategory] = useState<ExpenseByCategory[]>([]);
   const [incomeVsExpenses, setIncomeVsExpenses] = useState<IncomeVsExpense[]>([]);
@@ -63,7 +63,7 @@ const Analytics: React.FC = () => {
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
-  const filters = {
+  const filters: { accountId?: string; accountType?: 'bank' | 'credit_card' } = {
     accountId: accountFilter || undefined,
     accountType: accountTypeFilter || undefined,
   };
@@ -256,7 +256,7 @@ const Analytics: React.FC = () => {
           </select>
           <select
             value={accountTypeFilter}
-            onChange={(e) => setAccountTypeFilter(e.target.value)}
+            onChange={(e) => setAccountTypeFilter(e.target.value as '' | 'bank' | 'credit_card')}
             className="select text-sm"
           >
             <option value="">All Types</option>

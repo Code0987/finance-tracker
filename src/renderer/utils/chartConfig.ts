@@ -1,4 +1,4 @@
-import { ChartOptions, Chart } from 'chart.js';
+import { Chart } from 'chart.js';
 
 // Default color palette for charts
 export const chartColors = {
@@ -20,8 +20,8 @@ export const categoryColorPalette = [
   '#14b8a6', '#78716c', '#0ea5e9', '#d946ef', '#a855f7',
 ];
 
-// Default chart options
-export const defaultChartOptions: ChartOptions = {
+// Default chart options - using 'any' for flexibility with Chart.js complex types
+export const defaultChartOptions: any = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -41,7 +41,7 @@ export const defaultChartOptions: ChartOptions = {
       titleFont: {
         family: 'Inter, sans-serif',
         size: 13,
-        weight: '600',
+        weight: 600,
       },
       bodyFont: {
         family: 'Inter, sans-serif',
@@ -74,7 +74,7 @@ export const defaultChartOptions: ChartOptions = {
           family: 'Inter, sans-serif',
           size: 11,
         },
-        callback: function(value) {
+        callback: function(value: number | string) {
           return '₹' + formatCompact(value as number);
         },
       },
@@ -83,7 +83,7 @@ export const defaultChartOptions: ChartOptions = {
 };
 
 // Doughnut/Pie chart options
-export const doughnutChartOptions: ChartOptions<'doughnut'> = {
+export const doughnutChartOptions: any = {
   responsive: true,
   maintainAspectRatio: false,
   cutout: '60%',
@@ -101,7 +101,7 @@ export const doughnutChartOptions: ChartOptions<'doughnut'> = {
     },
     tooltip: {
       callbacks: {
-        label: function(context) {
+        label: function(context: any) {
           const value = context.raw as number;
           const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
           const percentage = ((value / total) * 100).toFixed(1);
@@ -113,7 +113,7 @@ export const doughnutChartOptions: ChartOptions<'doughnut'> = {
 };
 
 // Line chart options
-export const lineChartOptions: ChartOptions<'line'> = {
+export const lineChartOptions: any = {
   ...defaultChartOptions,
   elements: {
     point: {
@@ -131,14 +131,13 @@ export const lineChartOptions: ChartOptions<'line'> = {
 };
 
 // Bar chart options
-export const barChartOptions: ChartOptions<'bar'> = {
+export const barChartOptions: any = {
   ...defaultChartOptions,
-  barThickness: 'flex',
   maxBarThickness: 50,
 };
 
 // Horizontal bar chart options
-export const horizontalBarChartOptions: ChartOptions<'bar'> = {
+export const horizontalBarChartOptions: any = {
   ...defaultChartOptions,
   indexAxis: 'y' as const,
   scales: {
@@ -147,7 +146,7 @@ export const horizontalBarChartOptions: ChartOptions<'bar'> = {
         color: 'rgba(100, 116, 139, 0.1)',
       },
       ticks: {
-        callback: function(value) {
+        callback: function(value: number | string) {
           return '₹' + formatCompact(value as number);
         },
       },

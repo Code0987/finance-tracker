@@ -4,8 +4,8 @@ import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import './styles/index.css';
 
-// Initialize mock API for development
-import './utils/mockApi';
+// Initialize the browser API (IndexedDB-based)
+import './utils/api';
 
 // Use HashRouter for Electron (file:// protocol)
 const isElectron = typeof window !== 'undefined' && 

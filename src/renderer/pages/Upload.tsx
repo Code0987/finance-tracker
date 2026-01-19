@@ -4,13 +4,10 @@ import { useStore } from '../store/useStore';
 import { useApi } from '../hooks/useApi';
 import { FiUploadCloud, FiFile, FiCheckCircle, FiAlertCircle, FiTrash2, FiMail, FiPlus } from 'react-icons/fi';
 import Modal from '../components/Modal';
+import { setPendingFile } from '../utils/api';
 
 interface UploadedFile {
-  file: {
-    name: string;
-    size: number;
-    path: string;
-  };
+  file: File;
   status: 'pending' | 'processing' | 'success' | 'error';
   transactionCount?: number;
   error?: string;
@@ -24,6 +21,13 @@ const Upload: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showNewAccountModal, setShowNewAccountModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  
+  // Auto-select first account if available
+  React.useEffect(() => {
+    if (!selectedAccountId && accounts.length > 0) {
+      setSelectedAccountId(accounts[0].id);
+    }
+  }, [accounts, selectedAccountId]);
   const [newAccount, setNewAccount] = useState({
     name: '',
     bankName: '',
@@ -50,19 +54,18 @@ const Upload: React.FC = () => {
     if (!account) return;
 
     const newFiles: UploadedFile[] = acceptedFiles.map((file) => ({
-      file: {
-        name: file.name,
-        size: file.size,
-        path: (file as any).path || file.name,
-      },
+      file,
       status: 'pending' as const,
     }));
 
+    const startIndex = uploadedFiles.length;
     setUploadedFiles((prev) => [...prev, ...newFiles]);
 
-    // Process files
-    for (let i = 0; i < newFiles.length; i++) {
-      const fileIndex = uploadedFiles.length + i;
+    // Process files sequentially
+    for (let i = 0; i < acceptedFiles.length; i++) {
+      const fileIndex = startIndex + i;
+      const file = acceptedFiles[i];
+      
       setUploadedFiles((prev) => {
         const updated = [...prev];
         if (updated[fileIndex]) {
@@ -72,33 +75,41 @@ const Upload: React.FC = () => {
       });
 
       try {
-        const result = await parseFile(newFiles[i].file.path, selectedAccountId, account.type);
+        // Set the file for the mock API to use
+        setPendingFile(file);
+        
+        // Call parse with the file name (the actual file is accessed via setPendingFile)
+        const result = await parseFile(file.name, selectedAccountId, account.type);
         
         setUploadedFiles((prev) => {
           const updated = [...prev];
-          if (result.success) {
-            updated[fileIndex] = {
-              ...updated[fileIndex],
-              status: 'success',
-              transactionCount: result.count,
-            };
-          } else {
-            updated[fileIndex] = {
-              ...updated[fileIndex],
-              status: 'error',
-              error: result.error,
-            };
+          if (updated[fileIndex]) {
+            if (result.success) {
+              updated[fileIndex] = {
+                ...updated[fileIndex],
+                status: 'success',
+                transactionCount: result.count,
+              };
+            } else {
+              updated[fileIndex] = {
+                ...updated[fileIndex],
+                status: 'error',
+                error: result.error || 'Failed to parse file',
+              };
+            }
           }
           return updated;
         });
       } catch (error: any) {
         setUploadedFiles((prev) => {
           const updated = [...prev];
-          updated[fileIndex] = {
-            ...updated[fileIndex],
-            status: 'error',
-            error: error.message,
-          };
+          if (updated[fileIndex]) {
+            updated[fileIndex] = {
+              ...updated[fileIndex],
+              status: 'error',
+              error: error.message,
+            };
+          }
           return updated;
         });
       }
@@ -121,66 +132,20 @@ const Upload: React.FC = () => {
       return;
     }
 
-    const filePaths = await openFileDialog();
-    if (filePaths && filePaths.length > 0) {
-      const account = accounts.find(a => a.id === selectedAccountId);
-      if (!account) return;
-
-      const newFiles: UploadedFile[] = filePaths.map((path) => ({
-        file: {
-          name: path.split('/').pop() || path,
-          size: 0,
-          path,
-        },
-        status: 'pending' as const,
-      }));
-
-      setUploadedFiles((prev) => [...prev, ...newFiles]);
-
-      // Process files
-      for (let i = 0; i < newFiles.length; i++) {
-        const fileIndex = uploadedFiles.length + i;
-        setUploadedFiles((prev) => {
-          const updated = [...prev];
-          if (updated[fileIndex]) {
-            updated[fileIndex] = { ...updated[fileIndex], status: 'processing' };
-          }
-          return updated;
-        });
-
-        try {
-          const result = await parseFile(newFiles[i].file.path, selectedAccountId, account.type);
-          
-          setUploadedFiles((prev) => {
-            const updated = [...prev];
-            if (result.success) {
-              updated[fileIndex] = {
-                ...updated[fileIndex],
-                status: 'success',
-                transactionCount: result.count,
-              };
-            } else {
-              updated[fileIndex] = {
-                ...updated[fileIndex],
-                status: 'error',
-                error: result.error,
-              };
-            }
-            return updated;
-          });
-        } catch (error: any) {
-          setUploadedFiles((prev) => {
-            const updated = [...prev];
-            updated[fileIndex] = {
-              ...updated[fileIndex],
-              status: 'error',
-              error: error.message,
-            };
-            return updated;
-          });
-        }
+    // In browser mode, we use a hidden file input instead of Electron dialog
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.pdf,.csv,.xlsx,.xls';
+    
+    input.onchange = async (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files && files.length > 0) {
+        onDrop(Array.from(files));
       }
-    }
+    };
+    
+    input.click();
   };
 
   const handleCreateAccount = async () => {
@@ -189,7 +154,8 @@ const Upload: React.FC = () => {
       return;
     }
 
-    await createAccount(newAccount);
+    const created = await createAccount(newAccount);
+    setSelectedAccountId(created.id); // Auto-select the new account
     setShowNewAccountModal(false);
     setNewAccount({
       name: '',
@@ -332,26 +298,29 @@ const Upload: React.FC = () => {
             <h3 className="font-medium text-slate-900">Uploaded Files</h3>
           </div>
           <div className="divide-y divide-slate-100">
-            {uploadedFiles.map((file, index) => (
+            {uploadedFiles.map((uploadedFile, index) => (
               <div key={index} className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    file.status === 'success' ? 'bg-success-50' :
-                    file.status === 'error' ? 'bg-danger-50' :
-                    file.status === 'processing' ? 'bg-primary-50' :
+                    uploadedFile.status === 'success' ? 'bg-success-50' :
+                    uploadedFile.status === 'error' ? 'bg-danger-50' :
+                    uploadedFile.status === 'processing' ? 'bg-primary-50' :
                     'bg-slate-50'
                   }`}>
-                    {file.status === 'success' && <FiCheckCircle className="w-5 h-5 text-success-600" />}
-                    {file.status === 'error' && <FiAlertCircle className="w-5 h-5 text-danger-500" />}
-                    {file.status === 'processing' && <div className="spinner" />}
-                    {file.status === 'pending' && <FiFile className="w-5 h-5 text-slate-400" />}
+                    {uploadedFile.status === 'success' && <FiCheckCircle className="w-5 h-5 text-success-600" />}
+                    {uploadedFile.status === 'error' && <FiAlertCircle className="w-5 h-5 text-danger-500" />}
+                    {uploadedFile.status === 'processing' && <div className="spinner" />}
+                    {uploadedFile.status === 'pending' && <FiFile className="w-5 h-5 text-slate-400" />}
                   </div>
                   <div>
-                    <p className="font-medium text-sm">{file.file.name}</p>
+                    <p className="font-medium text-sm">{uploadedFile.file.name}</p>
                     <p className="text-xs text-slate-500">
-                      {formatFileSize(file.file.size)}
-                      {file.status === 'success' && ` • ${file.transactionCount} transactions imported`}
-                      {file.status === 'error' && ` • ${file.error}`}
+                      {formatFileSize(uploadedFile.file.size)}
+                      {uploadedFile.status === 'success' && ` • ${uploadedFile.transactionCount} transactions imported`}
+                      {uploadedFile.status === 'error' && (
+                        <span className="text-danger-500"> • {uploadedFile.error}</span>
+                      )}
+                      {uploadedFile.status === 'processing' && ' • Processing...'}
                     </p>
                   </div>
                 </div>

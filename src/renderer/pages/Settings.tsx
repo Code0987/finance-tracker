@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { useApi } from '../hooks/useApi';
+import { db } from '../utils/database';
 import { FiSave, FiRefreshCw, FiTrash2, FiMail, FiDatabase, FiInfo, FiCheck } from 'react-icons/fi';
 
 const Settings: React.FC = () => {
@@ -84,8 +85,14 @@ const Settings: React.FC = () => {
     if (!confirm('This will delete ALL accounts and transactions. Are you absolutely sure?')) {
       return;
     }
-    // In a real app, we'd call an API to clear the database
-    alert('Data cleared. Please restart the application.');
+    
+    try {
+      await db.clearAllData();
+      alert('All data has been cleared. The page will now reload.');
+      window.location.reload();
+    } catch (error: any) {
+      alert('Failed to clear data: ' + error.message);
+    }
   };
 
   const stats = {

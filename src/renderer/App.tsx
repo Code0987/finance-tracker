@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useApi } from './hooks/useApi';
 import { useStore } from './store/useStore';
+import { db } from './utils/database';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -18,24 +19,69 @@ import Settings from './pages/Settings';
 
 const App: React.FC = () => {
   const { fetchAccounts, fetchCategories, fetchTransactions, fetchSummary } = useApi();
-  const { isSidebarOpen, isLoading } = useStore();
+  const { isSidebarOpen, isLoading, setIsLoading } = useStore();
+  const [dbInitialized, setDbInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Initial data load
-    const loadData = async () => {
+    // Initialize database and load data
+    const initializeApp = async () => {
+      setIsLoading(true);
       try {
+        // Initialize the IndexedDB database
+        await db.init();
+        setDbInitialized(true);
+        
+        // Load initial data
         await Promise.all([
           fetchAccounts(),
           fetchCategories(),
           fetchTransactions(),
           fetchSummary(),
         ]);
-      } catch (error) {
-        console.error('Failed to load initial data:', error);
+      } catch (error: any) {
+        console.error('Failed to initialize app:', error);
+        setInitError(error.message || 'Failed to initialize database');
+      } finally {
+        setIsLoading(false);
       }
     };
-    loadData();
+    
+    initializeApp();
   }, []);
+
+  // Show error if initialization failed
+  if (initError) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center p-8 bg-white rounded-xl shadow-lg max-w-md">
+          <div className="w-16 h-16 bg-danger-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <h1 className="text-xl font-semibold text-slate-900 mb-2">Initialization Error</h1>
+          <p className="text-slate-600 mb-4">{initError}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="btn-primary"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while initializing
+  if (!dbInitialized) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="spinner w-12 h-12"></div>
+          <span className="text-slate-600">Initializing Finance Tracker...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex bg-slate-50">

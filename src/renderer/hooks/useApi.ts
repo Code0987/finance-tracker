@@ -121,6 +121,9 @@ export const useApi = () => {
       const result = await window.electronAPI.parseFile(filePath, accountId, accountType);
       if (result.success && result.transactions) {
         addTransactions(result.transactions);
+        // Also refresh summary after adding transactions
+        const summary = await window.electronAPI.getSummary();
+        setSummary(summary);
       }
       return result;
     } catch (error) {
@@ -129,7 +132,7 @@ export const useApi = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [addTransactions, setIsLoading]);
+  }, [addTransactions, setIsLoading, setSummary]);
 
   const openFileDialog = useCallback(async () => {
     try {
