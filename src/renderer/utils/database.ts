@@ -191,14 +191,22 @@ class BrowserDatabase {
 
   async deleteAccount(id: string): Promise<void> {
     await this.init();
-    // Delete account
+    
+    // First, get all transaction IDs for this account BEFORE deleting anything
+    const txnStore = this.getStore('transactions');
+    const allTransactions: Transaction[] = await this.promisifyRequest(txnStore.getAll());
+    const transactionIdsToDelete = allTransactions
+      .filter(t => t.accountId === id)
+      .map(t => t.id);
+    
+    // Delete the account
     const accountStore = this.getStore('accounts', 'readwrite');
     await this.promisifyRequest(accountStore.delete(id));
-    // Delete related transactions
-    const transactions = await this.getTransactions({ accountId: id });
-    const txnStore = this.getStore('transactions', 'readwrite');
-    for (const txn of transactions) {
-      await this.promisifyRequest(txnStore.delete(txn.id));
+    
+    // Delete related transactions one by one (each in its own transaction)
+    for (const txnId of transactionIdsToDelete) {
+      const store = this.getStore('transactions', 'readwrite');
+      await this.promisifyRequest(store.delete(txnId));
     }
   }
 

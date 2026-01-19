@@ -66,11 +66,17 @@ export const useApi = () => {
     try {
       await window.electronAPI.deleteAccount(id);
       removeAccount(id);
+      // Also refresh transactions to remove ones belonging to deleted account
+      const transactions = await window.electronAPI.getTransactions();
+      setTransactions(transactions);
+      // And refresh summary
+      const summary = await window.electronAPI.getSummary();
+      setSummary(summary);
     } catch (error) {
       console.error('Failed to delete account:', error);
       throw error;
     }
-  }, [removeAccount]);
+  }, [removeAccount, setTransactions, setSummary]);
 
   // Transactions
   const fetchTransactions = useCallback(async (customFilters?: Filters) => {
