@@ -3,6 +3,7 @@ import { simpleParser, ParsedMail, Attachment } from 'mailparser';
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
+import { Readable } from 'stream';
 
 interface EmailConfig {
   email: string;
@@ -48,14 +49,14 @@ export class EmailFetcher {
       const attachments: FetchedAttachment[] = [];
 
       imap.once('ready', () => {
-        imap.openBox('INBOX', true, (err, box) => {
+        imap.openBox('INBOX', true, (err) => {
           if (err) {
             reject(err);
             return;
           }
 
           // Search for emails with bank statement keywords
-          const searchCriteria = [
+          const searchCriteria: any[] = [
             ['OR',
               ['OR',
                 ['SUBJECT', 'statement'],
@@ -69,9 +70,9 @@ export class EmailFetcher {
             ['SINCE', this.getSearchDate(90)], // Last 90 days
           ];
 
-          imap.search(searchCriteria, (err, results) => {
-            if (err) {
-              reject(err);
+          imap.search(searchCriteria, (searchErr, results) => {
+            if (searchErr) {
+              reject(searchErr);
               return;
             }
 
@@ -86,15 +87,20 @@ export class EmailFetcher {
               struct: true,
             });
 
-            fetch.on('message', (msg, seqno) => {
-              msg.on('body', async (stream) => {
-                try {
-                  const parsed = await simpleParser(stream);
-                  const emailAttachments = await this.processEmail(parsed);
-                  attachments.push(...emailAttachments);
-                } catch (parseErr) {
-                  console.error('Error parsing email:', parseErr);
-                }
+            fetch.on('message', (msg) => {
+              msg.on('body', (stream: Readable) => {
+                const chunks: Buffer[] = [];
+                stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+                stream.on('end', async () => {
+                  try {
+                    const buffer = Buffer.concat(chunks);
+                    const parsed = await simpleParser(buffer);
+                    const emailAttachments = await this.processEmail(parsed);
+                    attachments.push(...emailAttachments);
+                  } catch (parseErr) {
+                    console.error('Error parsing email:', parseErr);
+                  }
+                });
               });
             });
 
@@ -110,8 +116,8 @@ export class EmailFetcher {
         });
       });
 
-      imap.once('error', (err: Error) => {
-        reject(err);
+      imap.once('error', (imapErr: Error) => {
+        reject(imapErr);
       });
 
       imap.connect();

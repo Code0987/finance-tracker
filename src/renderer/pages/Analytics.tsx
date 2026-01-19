@@ -17,7 +17,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
-import { Doughnut, Bar, Line, Pie, Radar, PolarArea } from 'react-chartjs-2';
+import { Doughnut, Bar, Line, PolarArea } from 'react-chartjs-2';
 import { FiDownload, FiTrendingUp, FiTrendingDown, FiMinus } from 'react-icons/fi';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';

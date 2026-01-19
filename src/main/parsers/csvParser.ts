@@ -53,7 +53,7 @@ export class CSVParser {
             reject(error);
           }
         },
-        error: (error) => {
+        error: (error: Error) => {
           reject(error);
         },
       });
