@@ -1,10 +1,21 @@
 // Browser-compatible file parser for CSV and PDF files
 import Papa from 'papaparse';
-import * as pdfjsLib from 'pdfjs-dist';
 
-// Set up PDF.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// PDF.js with Vite-compatible worker setup
+let pdfjsLib: typeof import('pdfjs-dist') | null = null;
+let pdfjsInitialized = false;
+
+async function initPdfJs(): Promise<typeof import('pdfjs-dist')> {
+  if (pdfjsLib && pdfjsInitialized) return pdfjsLib;
+  
+  pdfjsLib = await import('pdfjs-dist');
+  
+  // Import the worker using Vite's worker import syntax
+  const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker.default;
+  
+  pdfjsInitialized = true;
+  return pdfjsLib;
 }
 
 export interface ParsedTransaction {
@@ -178,8 +189,11 @@ export class BrowserFileParser {
 
   private async parsePDF(file: File): Promise<ParsedTransaction[]> {
     try {
+      // Initialize PDF.js
+      const pdfjs = await initPdfJs();
+      
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
       
       let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
