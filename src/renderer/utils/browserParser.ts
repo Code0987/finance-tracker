@@ -1,20 +1,11 @@
 // Browser-compatible file parser for CSV and PDF files
 import Papa from 'papaparse';
+import * as pdfjsLib from 'pdfjs-dist';
 
-// Dynamic import for PDF.js to avoid build issues
-let pdfjsLib: any = null;
-
-const loadPdfJs = async () => {
-  if (pdfjsLib) return pdfjsLib;
-  try {
-    pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    return pdfjsLib;
-  } catch (e) {
-    console.warn('PDF.js not available, PDF parsing will be limited');
-    return null;
-  }
-};
+// Set up PDF.js worker
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
 
 export interface ParsedTransaction {
   date: string;
@@ -187,14 +178,8 @@ export class BrowserFileParser {
 
   private async parsePDF(file: File): Promise<ParsedTransaction[]> {
     try {
-      const pdfjs = await loadPdfJs();
-      
-      if (!pdfjs) {
-        throw new Error('PDF parsing is not available. Please upload a CSV file instead, or install pdfjs-dist.');
-      }
-      
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       
       let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
